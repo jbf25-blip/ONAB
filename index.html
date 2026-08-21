@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONAB - Guardião da Corrosão</title>
+    <style>
+        :root {
+            --bg-game: #061121;
+            --panel-bg: rgba(11, 31, 54, 0.88);
+            --border-color: #285482;
+            --text-color: #ffffff;
+            --btn-bg: #112d4a;
+            --btn-border: #24507d;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+        
+        body {
+            background-color: #050b14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            width: 100vw;
+            max-width: 420px;
+            height: 100vh;
+            max-height: 840px;
+            background-image: url('fundo1.png');
+            background-size: cover;
+            background-position: center;
+            background-color: var(--bg-game);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+            border: 4px solid #1c3b5e;
+            overflow: hidden;
+            transition: background-color 1.5s ease;
+        }
+
+        #vignette-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 3;
+            box-shadow: inset 0 0 0 rgba(0, 0, 0, 0);
+            transition: box-shadow 0.5s ease;
+        }
+
+        /* Flash de Escudo Eletrostático */
+        #shield-flash {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(72,219,251,0.6) 0%, rgba(0,0,0,0) 70%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 25;
+            transition: opacity 0.3s ease;
+        }
+        #shield-flash.active {
+            opacity: 1;
+        }
+
+        .particle {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.35);
+            font-size: 11px;
+            pointer-events: none;
+            user-select: none;
+            z-index: 2;
+            animation: riseParticle linear infinite;
+        }
+        @keyframes riseParticle {
+            0% { transform: translateY(840px) scale(0.8); opacity: 0; }
+            20% { opacity: 0.5; }
+            80% { opacity: 0.5; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+
+        .edge-particle {
+            position: absolute;
+            color: rgba(150, 220, 255, 0.65);
+            font-size: 10px;
+            pointer-events: none;
+            user-select: none;
+            z-index: 2;
+            text-shadow: 0 0 3px rgba(0, 150, 255, 0.5);
+            animation: pulseEdge 2s ease-in-out infinite alternate;
+        }
+        @keyframes pulseEdge {
+            0% { opacity: 0.4; transform: scale(0.95); }
+            100% { opacity: 0.9; transform: scale(1.05); }
+        }
+
+        /* Corações flutuantes ao fazer carinho */
+        .heart-particle {
+            position: absolute;
+            color: #e84393;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 20;
+            animation: floatHeart 1.2s ease-out forwards;
+        }
+        @keyframes floatHeart {
+            0% { transform: translateY(0) scale(0.6); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1.3); opacity: 0; }
+        }
+
+        /* Textos flutuantes de feedback dinâmico */
+        .floating-feedback {
+            position: absolute;
+            color: #48dbfb;
+            font-size: 11px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 30;
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+            animation: floatFeedback 1s ease-out forwards;
+        }
+        @keyframes floatFeedback {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+
+        /* Partículas de oxidação desvanecendo na limpeza */
+        .oxidation-particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #ff7675;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 20;
+            box-shadow: 0 0 6px #d63031;
+            animation: spreadOxidation 0.8s ease-out forwards;
+        }
+        @keyframes spreadOxidation {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+        }
+
+        .top-panel { 
+            display: flex; 
+            flex-direction: column;
+            gap: 6px; 
+            z-index: 4; 
+        }
+        
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status-box { 
+            background: var(--panel-bg); 
+            border: 1px solid var(--border-color); 
+            padding: 5px; 
+            width: 31%; 
+            text-align: center; 
+            color: var(--text-color); 
+            font-size: 8.5px; 
+            font-weight: bold; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+        .status-box:hover { background: rgba(18, 50, 84, 0.95); }
+        
+        .bar-container { display: flex; gap: 2px; margin-top: 3px; justify-content: center; }
+        .bar { width: 9px; height: 9px; background-color: #1c3b5e; border-radius: 2px; transition: background-color 0.4s; }
+        .bar.active-green { background-color: #2ecc71; box-shadow: 0 0 4px #2ecc71; }
+        .bar.active-blue { background-color: #3498db; box-shadow: 0 0 4px #3498db; }
+        .bar.active-pink { background-color: #e84393; box-shadow: 0 0 4px #e84393; }
+
+        .counter-box-small {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 5px;
+            color: var(--text-color);
+            font-size: 9.5px;
+            text-align: center;
+            font-weight: bold;
+            width: 48%;
+        }
+
+        /* Indicador de Ritmo Cardíaco / Frequência Bioenergética com animação dinâmica de pulso */
+        .ecg-container {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 2px 4px;
+            width: 100%;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .ecg-label {
+            font-size: 7.5px;
+            color: #48dbfb;
+            font-weight: bold;
+        }
+        #ecg-svg {
+            width: 140px;
+            height: 16px;
+        }
+        #ecg-path {
+            animation: pulseEcgWave 1.2s ease-in-out infinite;
+            transform-origin: center;
+        }
+        @keyframes pulseEcgWave {
+            0%, 100% { transform: scaleX(1); opacity: 0.85; }
+            50% { transform: scaleX(1.04); opacity: 1; filter: drop-shadow(0 0 3px currentColor); }
+        }
+
+        .screen-area { text-align: center; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 4; position: relative; }
+        
+        .message-box { 
+            background: rgba(0, 0, 0, 0.85); 
+            color: #48dbfb; 
+            padding: 10px; 
+            border-radius: 4px; 
+            font-size: 10px; 
+            margin-bottom: 10px; 
+            width: 100%; 
+            border: 1px solid var(--border-color); 
+            opacity: 1;
+            min-height: 42px;
+            height: auto;
+            max-height: 120px;
+            overflow-y: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-word;
+            line-height: 1.3;
+            transition: opacity 0.5s ease;
+        }
+        .message-box.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .pet-area { height: 200px; display: flex; justify-content: center; align-items: center; position: relative; width: 100%; }
+        
+        .pet-shadow {
+            position: absolute;
+            width: 120px;
+            height: 35px;
+            background: radial-gradient(ellipse at center, rgba(52, 152, 219, 0.5) 0%, rgba(0, 0, 0, 0) 70%);
+            bottom: 20px;
+            border-radius: 50%;
+            animation: shadowPulse 3s ease-in-out infinite;
+            z-index: 1;
+        }
+
+        .pet-image { 
+            max-width: 180px; 
+            max-height: 180px; 
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            animation: float 3s ease-in-out infinite, biolumPulse 4s ease-in-out infinite alternate; 
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease; 
+            display: block;
+            z-index: 2;
+            cursor: pointer;
+            filter: drop-shadow(0 0 12px rgba(46, 204, 113, 0.3));
+        }
+
+        @keyframes biolumPulse {
+            0% { filter: drop-shadow(0 0 8px rgba(72, 219, 251, 0.4)) brightness(0.95); }
+            100% { filter: drop-shadow(0 0 20px rgba(72, 219, 251, 0.9)) brightness(1.08); }
+        }
+
+        .pet-shake {
+            animation: shakePet 0.4s ease infinite, float 3s ease-in-out infinite !important;
+        }
+        @keyframes shakePet {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-2px, 2px) rotate(-2deg); }
+            40% { transform: translate(2px, -2px) rotate(2deg); }
+            60% { transform: translate(-1px, -1px) rotate(-1deg); }
+            80% { transform: translate(1px, 1px) rotate(1deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        .biolum-night {
+            filter: drop-shadow(0 0 22px rgba(0, 255, 255, 0.9)) brightness(0.8) !important;
+        }
+
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+        @keyframes shadowPulse { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(0.85); opacity: 0.2; } }
+
+        .bottom-panel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; z-index: 4; }
+        .action-btn { background: var(--btn-bg); border: 1px solid var(--btn-border); padding: 8px 1px; color: white; font-size: 7px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; border-radius: 4px; text-align: center; white-space: nowrap; }
+        .action-btn:active { transform: scale(0.95); background: #183759; }
+
+        .sub-bottom-panel {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+            z-index: 4;
+        }
+        .secondary-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 4px;
+            padding: 7px 2px;
+            color: white;
+            font-size: 8.5px;
+            text-align: center;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .secondary-btn:hover { background: #183759; }
+
+        .active-ion {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background: radial-gradient(circle, #ff7675 0%, #d63031 100%);
+            border-radius: 50%;
+            border: 2px solid #fff;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 8px #ff7675;
+            animation: moveIon 2.5s linear infinite;
+        }
+        @keyframes moveIon {
+            0% { transform: translateY(0) scale(0.8); }
+            100% { transform: translateY(-160px) scale(1.1); }
+        }
+
+        .parasite-badge {
+            position: absolute;
+            background: #b22222;
+            color: white;
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 50%;
+            border: 1px solid #ff4500;
+            z-index: 5;
+            animation: pulseEdge 1s infinite alternate;
+        }
+
+        #modal-sobre {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 10, 20, 0.96);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            padding: 15px;
+            justify-content: space-between;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+        .modal-header h2 { font-size: 13px; color: #48dbfb; }
+        .close-modal-btn {
+            background: #c0392b;
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .modal-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .modal-tab-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            color: white;
+            font-size: 9.5px;
+            text-align: left;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .modal-tab-btn:hover { background: #183759; }
+        .modal-content-box {
+            background: rgba(10, 25, 45, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            flex-grow: 1;
+            margin-top: 5px;
+            overflow-y: auto;
+            font-size: 9.5px;
+            color: #dcdde1;
+            line-height: 1.4;
+        }
+        .modal-content-box h3 { color: #feca57; margin-bottom: 5px; font-size: 10.5px; }
+        .modal-content-box p { margin-bottom: 6px; }
+        .author-sign {
+            text-align: center;
+            font-size: 8.5px;
+            color: #74b9ff;
+            margin-top: 5px;
+            font-weight: bold;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="vignette-overlay"></div>
+        <div id="shield-flash"></div>
+        <div id="particles-container"></div>
+        <div id="lightning-container" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5;"></div>
+
+        <!-- Painel Superior -->
+        <div class="top-panel">
+            <div class="top-row">
+                <div class="status-box" onclick="mostrarInfoStatus('estrutura')">
+                    ESTRUTURA
+                    <div class="bar-container" id="struct-bars"></div>
+                </div>
+                <div class="status-box" onclick="mostrarInfoStatus('energia')">
+                    ENERGIA
+                    <div class="bar-container" id="energy-bars"></div>
+                </div>
+                <div class="status-box" onclick="mostrarInfoStatus('vinculo')">
+                    VÍNCULO
+                    <div class="bar-container" id="bond-bars"></div>
+                </div>
+            </div>
+            <div class="top-row">
+                <div class="counter-box-small">Íons Cl⁻: <span id="cl-count">128</span></div>
+                <div class="counter-box-small">Dias Vivo: <span id="days-count">1</span></div>
+            </div>
+            <div class="ecg-container">
+                <span class="ecg-label">BIO-FREQ</span>
+                <svg id="ecg-svg" viewBox="0 0 140 16">
+                    <path id="ecg-path" d="M0,8 L20,8 L25,2 L30,14 L35,8 L60,8 L65,0 L72,16 L78,8 L100,8 L105,4 L110,12 L115,8 L140,8" fill="none" stroke="#2ecc71" stroke-width="1.5" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Área Central / Pet -->
+        <div class="screen-area" id="main-screen-area">
+            <div class="message-box" id="game-msg">ONAB inicializado. Sistema pronto para blindagem.</div>
+            <div class="pet-area" id="pet-wrapper">
+                <div class="pet-shadow"></div>
+                <img src="imagens_pet_neutro.png" alt="Pet Guardião" class="pet-image" id="pet-graphic" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'150\' height=\'150\'><text x=\'10\' y=\'80\' font-size=\'14\' fill=\'white\'>Erro Imagem</text></svg>';">
+            </div>
+        </div>
+
+        <!-- Painéis de Botões -->
+        <div>
+            <div class="bottom-panel">
+                <button class="action-btn" onclick="interagir('limpar', 'Ambiente higienizado e parasitas removidos!')">💧<br>LIMPAR</button>
+                <button class="action-btn" onclick="interagir('determinado', 'Alimentado com inibidores anticorrosivos.')">🧪<br>ALIMENTAR</button>
+                <button class="action-btn" onclick="interagir('feliz', 'Carinho aplicado! Vínculo e energia elevados.')">❤️<br>CARINHO</button>
+                <button class="action-btn" onclick="iniciarMinigame()">⚛️<br>COLETAR</button>
+                <button class="action-btn" onclick="interagir('sonolento', 'Modo de repouso noturno ativado.')">💤<br>DORMIR</button>
+            </div>
+            
+            <div class="sub-bottom-panel">
+                <button class="secondary-btn" onclick="mudarTema()">🎨 Tema</button>
+                <button class="secondary-btn" onclick="iniciarExpedicao()">🧭 Expedição</button>
+                <button class="secondary-btn" onclick="alternarNoite()">🌙 Luzes</button>
+                <button class="secondary-btn" onclick="abrirModalSobre()" style="background: #1b4f72; border-color: #3498db;">ℹ️ Sobre</button>
+            </div>
+        </div>
+
+        <!-- Modal "Sobre o Jogo e Interdisciplinaridade" -->
+        <div id="modal-sobre">
+            <div class="modal-header">
+                <h2>CENTRAL INFORMATIVA ONAB</h2>
+                <button class="close-modal-btn" onclick="fecharModalSobre()">X</button>
+            </div>
+            <div class="modal-menu">
+                <button class="modal-tab-btn" onclick="carregarConteudoModal('historia')">📖 1. A História e o Objetivo Lúdico</button>
+                <button class="modal-tab-btn" onclick="carregarConteudoModal('interdisciplinaridade')">🔬 2. Interdisciplinaridade no Ensino Médio</button>
+                <button class="modal-tab-btn" onclick="carregarConteudoModal('criador')">👨‍🏫 3. Sobre o Criador e Prática Pedagógica</button>
+            </div>
+            <div class="modal-content-box" id="modal-text-content">
+                <h3>Bem-vindo à Central Informativa!</h3>
+                <p>Selecione uma das opções acima para explorar a imersão lúdica, os conceitos científicos integrados e a história por trás deste projeto pedagógico inovador.</p>
+            </div>
+            <div class="author-sign">Criado por: Barros AJS</div>
+        </div>
+    </div>
+
+    <script>
+        let jogo = { 
+            estrutura: 7, 
+            energia: 7, 
+            vinculo: 3,
+            cloreto: 128, 
+            temaIndex: 0,
+            isNight: false,
+            parasitas: 0,
+            dataCriacao: null,
+            ultimaInteracao: null,
+            ultimaLimpeza: null,
+            limpezasHoje: 0,
+            dataUltimaContagemLimpeza: null
+        };
+
+        let msgTimeout = null;
+        let typewriterInterval = null;
+
+        const expressoes = {
+            "preocupado": "imagens_pet_preocupado.png",
+            "determinado": "imagens_pet_determinado.png",
+            "desconfiado": "imagens_pet_desconfiado.png",
+            "triste": "imagens_pet_triste.png",
+            "furioso": "imagens_pet_furioso.png",
+            "admirado": "imagens_pet_admirado.png",
+            "neutro": "imagens_pet_neutro.png",
+            "feliz": "imagens_pet_feliz.png",
+            "apavorado": "imagens_pet_apavorado.png",
+            "doente": "imagens_pet_doente.png",
+            "sonolento": "imagens_pet_sonolento.png"
+        };
+
+        const fundos = ["fundo1.png", "fundo2.png", "fundo3.png", "fundo4.png"];
+        
+        // Frases exclusivas para cada tema ao alternar
+        const frasesTema = [
+            "Bip! Adorei esta configuração clássica de laboratório.",
+            "Uau! As correntes azuladas deste setor trazem ótima estabilidade.",
+            "Incrível! Sinto as estruturas metálicas mais seguras por aqui.",
+            "Fascinante! Este ambiente profundo otimiza meus sensores bioenergéticos."
+        ];
+
+        function exibirMensagem(texto) {
+            const msgBox = document.getElementById('game-msg');
+            msgBox.classList.remove('hidden');
+            if (msgTimeout) clearTimeout(msgTimeout);
+            if (typewriterInterval) clearInterval(typewriterInterval);
+
+            msgBox.textContent = "";
+            let i = 0;
+            typewriterInterval = setInterval(() => {
+                if (i < texto.length) {
+                    msgBox.textContent += texto.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typewriterInterval);
+                }
+            }, 20);
+
+            msgTimeout = setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, 8000);
+        }
+
+        function mostrarTextoFlutuante(texto, x, y) {
+            const container = document.getElementById('game-container');
+            let el = document.createElement('div');
+            el.className = 'floating-feedback';
+            el.innerText = texto;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function dispararFlashEscudo() {
+            const flash = document.getElementById('shield-flash');
+            flash.classList.add('active');
+            setTimeout(() => flash.classList.remove('active'), 300);
+        }
+
+        function dispararOxidacaoDispersa() {
+            const wrapper = document.getElementById('pet-wrapper');
+            for(let i=0; i<12; i++) {
+                let p = document.createElement('div');
+                p.className = 'oxidation-particle';
+                p.style.left = '90px';
+                p.style.top = '90px';
+                let angle = Math.random() * Math.PI * 2;
+                let dist = 60 + Math.random() * 80;
+                p.style.setProperty('--dx', (Math.cos(angle) * dist) + 'px');
+                p.style.setProperty('--dy', (Math.sin(angle) * dist) + 'px');
+                wrapper.appendChild(p);
+                setTimeout(() => p.remove(), 800);
+            }
+        }
+
+        // Raios estáticos animados com SVG procedural dinâmico
+        function atualizarRaiosEstaticos() {
+            const container = document.getElementById('lightning-container');
+            container.innerHTML = '';
+            if (jogo.cloreto > 150) {
+                let svgNS = "http://www.w3.org/2000/svg";
+                let svg = document.createElementNS(svgNS, "svg");
+                svg.setAttribute("width", "100%");
+                svg.setAttribute("height", "100%");
+                
+                let line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", Math.random() * 400);
+                line.setAttribute("y1", "0");
+                line.setAttribute("x2", "210");
+                line.setAttribute("y2", "380");
+                line.setAttribute("stroke", "#ff7675");
+                line.setAttribute("stroke-width", "2");
+                line.setAttribute("stroke-dasharray", "4,2");
+                svg.appendChild(line);
+                container.appendChild(svg);
+            }
+        }
+
+        function gerenciarParticulas() {
+            const container = document.getElementById('particles-container');
+            container.innerHTML = '';
+            
+            let agora = new Date().getTime();
+            if (!jogo.ultimaLimpeza) jogo.ultimaLimpeza = agora;
+            let horasSemLimpar = (agora - jogo.ultimaLimpeza) / (1000 * 60 * 60);
+
+            let petImgRef = document.getElementById('pet-graphic');
+            if (jogo.cloreto > 150 || horasSemLimpar > 15) {
+                petImgRef.classList.add('pet-shake');
+            } else {
+                petImgRef.classList.remove('pet-shake');
+            }
+
+            if (horasSemLimpar > 12) {
+                jogo.parasitas = Math.min(3, Math.floor((horasSemLimpar - 12) / 4) + 1);
+                let qtdParticulas = Math.min(25, Math.floor(jogo.cloreto / 5));
+                for (let i = 0; i < qtdParticulas; i++) {
+                    let p = document.createElement('div');
+                    p.className = 'edge-particle';
+                    p.innerText = 'Cl⁻';
+                    p.style.left = (Math.random() * 380) + 'px';
+                    p.style.top = (Math.random() * 650) + 'px';
+                    container.appendChild(p);
+                }
+            } else {
+                jogo.parasitas = 0;
+                for (let i = 0; i < 8; i++) {
+                    let p = document.createElement('div');
+                    p.className = 'particle';
+                    p.innerText = Math.random() > 0.5 ? 'Cl⁻' : '•';
+                    p.style.left = Math.random() * 380 + 'px';
+                    p.style.animationDuration = (Math.random() * 4 + 3) + 's';
+                    p.style.animationDelay = (Math.random() * 5) + 's';
+                    container.appendChild(p);
+                }
+            }
+
+            let petWrapper = document.getElementById('pet-wrapper');
+            document.querySelectorAll('.parasite-badge').forEach(el => el.remove());
+            for(let i=0; i < jogo.parasitas; i++) {
+                let badge = document.createElement('div');
+                badge.className = 'parasite-badge';
+                badge.innerText = '⚠️';
+                badge.style.top = (35 + i * 30) + 'px';
+                badge.style.right = (55 + (i * 12)) + 'px';
+                petWrapper.appendChild(badge);
+            }
+            atualizarRaiosEstaticos();
+        }
+
+        function atualizarVinhetaEPassagemTempo() {
+            let agora = new Date().getTime();
+            if (!jogo.ultimaLimpeza) jogo.ultimaLimpeza = agora;
+
+            let horasSemLimpar = (agora - jogo.ultimaLimpeza) / (1000 * 60 * 60);
+            let vignette = document.getElementById('vignette-overlay');
+            let container = document.getElementById('game-container');
+
+            if (jogo.isNight) {
+                vignette.style.boxShadow = `inset 0 0 160px rgba(2, 8, 20, 0.92)`;
+                container.style.backgroundColor = '#02060c';
+            } else if (horasSemLimpar > 12) {
+                let fatorIntensidade = Math.min(140, Math.floor((horasSemLimpar - 12) * 15));
+                vignette.style.boxShadow = `inset 0 0 ${fatorIntensidade}px rgba(0, 0, 0, 0.85)`;
+                container.style.backgroundColor = '#0b192c';
+            } else {
+                vignette.style.boxShadow = `inset 0 0 0 rgba(0, 0, 0, 0)`;
+                container.style.backgroundColor = 'var(--bg-game)';
+            }
+        }
+
+        function salvarProgresso() {
+            localStorage.setItem('onab_pet_save_v11', JSON.stringify(jogo));
+        }
+
+        function carregarProgresso() {
+            let salvo = localStorage.getItem('onab_pet_save_v11');
+            let agora = new Date().getTime();
+            
+            if (salvo) {
+                jogo = JSON.parse(salvo);
+                
+                let dataUltima = new Date(jogo.dataUltimaContagemLimpeza || agora).toDateString();
+                let dataAtualStr = new Date(agora).toDateString();
+                if (dataUltima !== dataAtualStr) {
+                    jogo.limpezasHoje = 0;
+                    jogo.dataUltimaContagemLimpeza = agora;
+                }
+
+                let diferencaHoras = (agora - jogo.ultimaInteracao) / (1000 * 60 * 60);
+                if (diferencaHoras > 12) {
+                    jogo.energia = Math.max(1, jogo.energia - Math.floor(diferencaHoras / 12));
+                    jogo.cloreto += Math.floor(diferencaHoras * 3);
+                }
+            } else {
+                jogo.dataCriacao = agora;
+                jogo.ultimaLimpeza = agora;
+                jogo.dataUltimaContagemLimpeza = agora;
+            }
+            jogo.ultimaInteracao = agora;
+            
+            let fundoAtual = fundos[jogo.temaIndex];
+            document.getElementById('game-container').style.backgroundImage = `url('${fundoAtual}')`;
+            
+            salvarProgresso();
+        }
+
+        function calcularDiasVivo() {
+            if (!jogo.dataCriacao) return 1;
+            let diffTime = Math.abs(new Date().getTime() - jogo.dataCriacao);
+            let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return Math.max(1, diffDays);
+        }
+
+        function interagir(tipo, msg, eventX = 200, eventY = 400) {
+            exibirMensagem(msg);
+            const imgElement = document.getElementById('pet-graphic');
+            
+            let expressaoAlvo = "neutro";
+            if(tipo === 'feliz') {
+                expressaoAlvo = "feliz";
+                mostrarTextoFlutuante("+1 Vínculo", eventX, eventY);
+            }
+            if(tipo === 'determinado') {
+                expressaoAlvo = "determinado";
+                dispararFlashEscudo();
+                mostrarTextoFlutuante("-6 Cl⁻", eventX, eventY);
+            }
+            if(tipo === 'limpar') {
+                expressaoAlvo = "admirado";
+                dispararFlashEscudo();
+                dispararOxidacaoDispersa();
+                mostrarTextoFlutuante("Área Limpa!", eventX, eventY);
+                jogo.ultimaLimpeza = new Date().getTime();
+                jogo.limpezasHoje++;
+                jogo.cloreto = Math.max(0, jogo.cloreto - 15);
+                jogo.parasitas = 0;
+            }
+            if(tipo === 'sonolento') expressaoAlvo = "sonolento";
+
+            if (expressoes[expressaoAlvo]) {
+                imgElement.src = expressoes[expressaoAlvo];
+            }
+
+            if(tipo === 'feliz') {
+                jogo.energia = Math.min(7, jogo.energia + 1);
+                jogo.vinculo = Math.min(7, jogo.vinculo + 1);
+                jogo.cloreto = Math.max(0, jogo.cloreto - 3);
+            }
+            if(tipo === 'determinado') {
+                jogo.energia = Math.min(7, jogo.energia + 1);
+                jogo.cloreto = Math.max(0, jogo.cloreto - 6);
+            }
+            if(tipo === 'sonolento') {
+                jogo.energia = 7;
+                imgElement.src = expressoes["sonolento"];
+            }
+
+            jogo.ultimaInteracao = new Date().getTime();
+            atualizarTela();
+        }
+
+        function avaliarHumorAutomatico() {
+            const imgElement = document.getElementById('pet-graphic');
+            let agora = new Date().getTime();
+            let horasSemLimpar = (agora - jogo.ultimaLimpeza) / (1000 * 60 * 60);
+            
+            let expr = "neutro";
+            
+            if (jogo.energia <= 1) {
+                expr = "doente";
+            } else if (horasSemLimpar > 18) {
+                expr = "apavorado";
+            } else if (horasSemLimpar > 12) {
+                expr = "preocupado";
+            } else if (jogo.cloreto > 180) {
+                expr = "furioso";
+            } else if (jogo.cloreto > 120) {
+                expr = "desconfiado";
+            } else if (jogo.estrutura <= 2) {
+                expr = "triste";
+            }
+            
+            if(expr !== "neutro") {
+                imgElement.src = expressoes[expr];
+            }
+        }
+
+        function atualizarBarras() {
+            const struct = document.getElementById('struct-bars');
+            const energy = document.getElementById('energy-bars');
+            const bond = document.getElementById('bond-bars');
+            struct.innerHTML = ''; 
+            energy.innerHTML = '';
+            bond.innerHTML = '';
+            
+            for(let i = 0; i < 7; i++) {
+                let b = document.createElement('div'); 
+                b.className = 'bar';
+                if(i < jogo.estrutura) {
+                    b.classList.add('active-green');
+                    if (jogo.estrutura <= 2) b.style.backgroundColor = '#e74c3c';
+                    else if (jogo.estrutura <= 4) b.style.backgroundColor = '#f1c40f';
+                    else b.style.backgroundColor = '#2ecc71';
+                }
+                struct.appendChild(b);
+            }
+            
+            for(let i = 0; i < 7; i++) {
+                let b = document.createElement('div'); 
+                b.className = 'bar';
+                if(i < jogo.energia) b.classList.add('active-blue');
+                energy.appendChild(b);
+            }
+
+            for(let i = 0; i < 7; i++) {
+                let b = document.createElement('div'); 
+                b.className = 'bar';
+                if(i < jogo.vinculo) b.classList.add('active-pink');
+                bond.appendChild(b);
+            }
+
+            let ecgPath = document.getElementById('ecg-path');
+            if (jogo.energia >= 5) {
+                ecgPath.setAttribute('stroke', '#2ecc71');
+            } else if (jogo.energia >= 3) {
+                ecgPath.setAttribute('stroke', '#f1c40f');
+            } else {
+                ecgPath.setAttribute('stroke', '#e74c3c');
+            }
+        }
+
+        function atualizarTela() {
+            let agora = new Date().getTime();
+            if (!jogo.ultimaLimpeza) jogo.ultimaLimpeza = agora;
+            let horasSemLimpar = (agora - jogo.ultimaLimpeza) / (1000 * 60 * 60);
+
+            if (horasSemLimpar > 12 || jogo.cloreto > 150) {
+                jogo.estrutura = Math.max(1, jogo.estrutura - 1);
+            } else if (jogo.energia >= 6 && jogo.cloreto < 50) {
+                jogo.estrutura = Math.min(7, jogo.estrutura + 1);
+            }
+
+            document.getElementById('cl-count').innerText = jogo.cloreto;
+            document.getElementById('days-count').innerText = calcularDiasVivo();
+            
+            const imgElement = document.getElementById('pet-graphic');
+            if (jogo.isNight) {
+                imgElement.classList.add('biolum-night');
+            } else {
+                imgElement.classList.remove('biolum-night');
+            }
+
+            atualizarBarras();
+            atualizarVinhetaEPassagemTempo();
+            gerenciarParticulas();
+            avaliarHumorAutomatico();
+            salvarProgresso();
+        }
+
+        function iniciarMinigame() {
+            exibirMensagem("Minigame ativo: Toque rapidamente nos íons de cloreto!");
+            dispararFlashEscudo();
+            const screenArea = document.getElementById('main-screen-area');
+            
+            let ionCount = 4;
+            for (let i = 0; i < 4; i++) {
+                let ion = document.createElement('div');
+                ion.className = 'active-ion';
+                ion.innerText = 'Cl⁻';
+                ion.style.left = (30 + Math.random() * 260) + 'px';
+                ion.style.bottom = (20 + Math.random() * 50) + 'px';
+                
+                ion.onclick = function(e) {
+                    mostrarTextoFlutuante("-3 Cl⁻", e.clientX, e.clientY);
+                    ion.remove();
+                    ionCount--;
+                    jogo.cloreto = Math.max(0, jogo.cloreto - 3);
+                    jogo.vinculo = Math.min(7, jogo.vinculo + 1);
+                    atualizarTela();
+                    if (ionCount === 0) {
+                        exibirMensagem("Neutralização perfeita concluída!");
+                    }
+                };
+                screenArea.appendChild(ion);
+                
+                setTimeout(() => {
+                    if (ion.parentElement) ion.remove();
+                }, 3000);
+            }
+        }
+
+        function iniciarExpedicao() {
+            exibirMensagem("Expedição subaquática iniciada nas Ruínas...");
+            dispararFlashEscudo();
+            setTimeout(() => {
+                let achados = ["Placa de Metal Antiga", "Cristal de Blindagem Raro", "Diário de Bordo Antigo"];
+                let itemEncontrado = achados[Math.floor(Math.random() * achados.length)];
+                jogo.cloreto = Math.max(0, jogo.cloreto - 10);
+                jogo.vinculo = Math.min(7, jogo.vinculo + 1);
+                exibirMensagem(`Expedição bem-sucedida! Retornou com: ${itemEncontrado}.`);
+                atualizarTela();
+            }, 5000);
+        }
+
+        function alternarNoite() {
+            jogo.isNight = !jogo.isNight;
+            if (jogo.isNight) {
+                exibirMensagem("Modo Noite ativado.");
+            } else {
+                exibirMensagem("Modo Dia reestabelecido.");
+            }
+            atualizarTela();
+        }
+
+        function mostrarInfoStatus(tipo) {
+            if(tipo === 'estrutura') exibirMensagem("ESTRUTURA: Integridade física e química do metal.");
+            if(tipo === 'energia') exibirMensagem("ENERGIA: Capacidade operacional do ONAB.");
+            if(tipo === 'vinculo') exibirMensagem("VÍNCULO: Grau de sincronia com o operador.");
+        }
+
+        function mudarTema() {
+            jogo.temaIndex = (jogo.temaIndex + 1) % fundos.length;
+            let fundoAtual = fundos[jogo.temaIndex];
+            document.getElementById('game-container').style.backgroundImage = `url('${fundoAtual}')`;
+            
+            // Fala específica do ONAB para cada tema escolhido
+            exibirMensagem(frasesTema[jogo.temaIndex]);
+            const imgElement = document.getElementById('pet-graphic');
+            imgElement.src = expressoes['admirado'];
+            
+            salvarProgresso();
+        }
+
+        function abrirModalSobre() {
+            document.getElementById('modal-sobre').style.display = 'flex';
+        }
+
+        function fecharModalSobre() {
+            document.getElementById('modal-sobre').style.display = 'none';
+        }
+
+        function carregarConteudoModal(secao) {
+            const caixa = document.getElementById('modal-text-content');
+            if (secao === 'historia') {
+                caixa.innerHTML = `
+                    <h3>A História e o Objetivo do ONAB</h3>
+                    <p>Nas profundezas abissais do oceano, em meio a ruínas esquecidas por civilizações ancestrais, repousa o <strong>ONAB</strong> — uma avançada bio-máquina senciente conhecida como o Guardião da Corrosão. Construído com ligas metálicas especiais e dotado de bioluminescência, sua função primária é manter o equilíbrio ecológico e conter a degradação ambiental acelerada provocada por agentes agressivos.</p>
+                    <p>Contudo, o ambiente marinho e a maresia constante carregam partículas nocivas que ameaçam sua estrutura. É aqui que você entra: na pele de um operador científico, sua missão é cuidar do ONAB, alimentar seus sistemas com inibidores anticorrosivos, higienizar o ambiente contra parasitas e neutralizar íons invasores antes que destruam o guardião.</p>
+                `;
+            } else if (secao === 'interdisciplinaridade') {
+                caixa.innerHTML = `
+                    <h3>Interdisciplinaridade nas Ciências da Natureza</h3>
+                    <p>O jogo foi estruturado para conectar a teoria escolar diretamente à prática imersiva:</p>
+                    <p><strong>🧪 Química (Corrosão e Íons Cloreto):</strong> Os íons cloreto (Cl⁻) são ânions altamente móveis que penetram e rompem a camada passivadora de óxido dos metais, provocando corrosão por pite e reações cíclicas contínuas que acidificam o meio. Em contrapartida, o jogo aborda o uso de <em>Inibidores Verdes de Corrosão</em> — substâncias biodegradáveis extraídas de fontes renováveis (como vegetais e glicerina) que formam uma película protetora sustentável sem agredir o ecossistema.</p>
+                    <p><strong>🧬 Biologia:</strong> Exploração de ecossistemas marinhos, adaptações biológicas extremas, bioluminescência e o impacto ecológico de poluentes e parasitas.</p>
+                    <p><strong>⚡ Física:</strong> Condutividade elétrica em soluções aquosas e eletrólitos condutivos que impulsionam reações de oxidação.</p>
+                `;
+            } else if (secao === 'criador') {
+                caixa.innerHTML = `
+                    <h3>Sobre o Criador e Prática Pedagógica</h3>
+                    <p>Mestre em Energias Renováveis e licenciado em Química e Matemática, com especializações voltadas à gestão ambiental e metodologias de ensino. Atua apaixonadamente na educação pública, desenvolvendo pesquisas em tecnologias educacionais, inovação pedagógica e sustentabilidade.</p>
+                    <p>Mais do que acadêmico, sou um entusiasta incansável por tecnologia e metodologias ativas. Acredito profundamente que o ensino de Química e ciências pode ser revolucionado através de ambientes lúdicos, permitindo que os estudantes experimentem, divirtam-se e construam conhecimento real de forma engajadora.</p>
+                `;
+            }
+        }
+
+        const petImg = document.getElementById('pet-graphic');
+        let lastTap = 0;
+        let touchStartX = 0;
+        let isSwiping = false;
+
+        function dispararCoracoes() {
+            const wrapper = document.getElementById('pet-wrapper');
+            for(let i=0; i<4; i++) {
+                let heart = document.createElement('div');
+                heart.className = 'heart-particle';
+                heart.innerText = '💖';
+                heart.style.left = (60 + Math.random() * 60) + 'px';
+                heart.style.bottom = (40 + Math.random() * 30) + 'px';
+                wrapper.appendChild(heart);
+                setTimeout(() => heart.remove(), 1200);
+            }
+        }
+
+        petImg.addEventListener('click', function(e) {
+            let currentTime = new Date().getTime();
+            let tapLength = currentTime - lastTap;
+            
+            if (tapLength < 300 && tapLength > 0) {
+                exibirMensagem("ONAB sorri radiante com o seu carinho!");
+                petImg.src = expressoes['feliz'];
+                jogo.vinculo = Math.min(7, jogo.vinculo + 1);
+                jogo.energia = Math.min(7, jogo.energia + 1);
+                dispararCoracoes();
+                mostrarTextoFlutuante("💖 +1 Vínculo", e.clientX, e.clientY);
+                atualizarTela();
+                e.preventDefault();
+            }
+            lastTap = currentTime;
+        });
+
+        petImg.addEventListener('touchstart', function(e) {
+            touchStartX = e.touches[0].clientX;
+            isSwiping = true;
+        }, {passive: true});
+
+        petImg.addEventListener('touchmove', function(e) {
+            if (!isSwiping) return;
+            let currentX = e.touches[0].clientX;
+            let diffX = currentX - touchStartX;
+            
+            if (Math.abs(diffX) > 60) {
+                exibirMensagem("Carinho lateral aplicado! O ONAB adorou o gesto.");
+                petImg.src = expressoes['feliz'];
+                jogo.vinculo = Math.min(7, jogo.vinculo + 1);
+                dispararCoracoes();
+                mostrarTextoFlutuante("✨ Carinho Ativado", currentX, 350);
+                atualizarTela();
+                isSwiping = false;
+            }
+        }, {passive: true});
+
+        petImg.addEventListener('touchend', function() {
+            isSwiping = false;
+        });
+
+        carregarProgresso();
+        atualizarTela();
+        
+        setInterval(() => {
+            atualizarVinhetaEPassagemTempo();
+        }, 30000);
+    </script>
+</body>
+</html>
